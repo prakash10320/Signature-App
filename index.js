@@ -14,6 +14,10 @@ const rotationInput = document.getElementById('rotationInput');
 const undoButton = document.getElementById('undoButton');
 const redoButton = document.getElementById('redoButton');
 
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+
 colorPicker.addEventListener('change', (event) => {
     ctx.fillStyle = event.target.value;
     ctx.strokeStyle = event.target.value;
@@ -21,7 +25,7 @@ colorPicker.addEventListener('change', (event) => {
 
 canvasColor.addEventListener('change', (event) => {
     ctx.fillStyle = event.target.value;
-    ctx.fillRect(0, 0, 800, 500);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 });
 
 clearButton.addEventListener('click', () => {
@@ -58,23 +62,19 @@ submitButton.addEventListener('click', () => {
         ctx.fillText(name, textX, textY);
 
         // Capture canvas state for undo
-        history.push(canvas.toDataURL()); // Add current state to history
-        historyIndex = history.length - 1; // Update history index
+        addToHistory();
     }
 });
 
-retrieveButton.addEventListener('click', () => {
-    let savedCanvas = localStorage.getItem('canvasContents');
-    if (savedCanvas) {
-        let img = new Image();
-        img.src = savedCanvas;
-        ctx.drawImage(img, 0, 0);
+function addToHistory() {
+    // If there are redo actions, clear them
+    if (historyIndex < history.length - 1) {
+        history.splice(historyIndex + 1);
     }
-});
-
-let isDrawing = false;
-let lastX = 0;
-let lastY = 0;
+    // Add current state to history
+    history.push(canvas.toDataURL());
+    historyIndex = history.length - 1;
+}
 
 canvas.addEventListener('mousedown', (event) => {
     isDrawing = true;
@@ -92,24 +92,21 @@ canvas.addEventListener('mousemove', (event) => {
         ctx.stroke();
         lastX = event.offsetX;
         lastY = event.offsetY;
-
-        // Capture canvas state for undo
-        history.push(canvas.toDataURL()); // Add current state to history
-        historyIndex = history.length - 1; // Update history index
     }
-});
-
-canvas.addEventListener('contextmenu', (event) => {
-    event.preventDefault();
 });
 
 canvas.addEventListener('mouseup', () => {
     if (isDrawing) {
-        // Capture canvas state for undo
-        history.push(canvas.toDataURL()); // Add current state to history
-        historyIndex = history.length - 1; // Update history index
+        isDrawing = false;
+        addToHistory();
     }
-    isDrawing = false;
+});
+
+canvas.addEventListener('mouseout', () => {
+    if (isDrawing) {
+        isDrawing = false;
+        addToHistory();
+    }
 });
 
 undoButton.addEventListener('click', () => {
@@ -138,22 +135,22 @@ redoButton.addEventListener('click', () => {
 
 rotationInput.addEventListener('change', () => {
     const rotationAngle = parseInt(rotationInput.value);
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Set font properties
-    ctx.font = `${fontSizePicker.value}px Arial`;
-    ctx.fillStyle = colorPicker.value;
-    // Calculate text position
-    const textX = canvas.width / 2 - ctx.measureText(textInput.value).width / 2;
-    const textY = canvas.height / 2;
-    // Save the current transformation matrix
     ctx.save();
-    // Translate to the center of the canvas
     ctx.translate(canvas.width / 2, canvas.height / 2);
-    // Rotate the canvas
     ctx.rotate(rotationAngle * Math.PI / 180);
-    // Draw text
-    ctx.fillText(textInput.value, -ctx.measureText(textInput.value).width / 2, fontSizePicker.value / 2);
-    // Restore the previous transformation matrix
+    ctx.translate(-canvas.width / 2, -canvas.height / 2);
+    redrawText();
     ctx.restore();
 });
+
+function redrawText() {
+    const name = textInput.value;
+    if (name.trim() !== '') {
+        ctx.font = `${fontSizePicker.value}px Arial`;
+        ctx.fillStyle = colorPicker.value;
+        const textX = canvas.width / 2 - ctx.measureText(name).width / 2;
+        const textY = canvas.height / 2;
+        ctx.fillText(name, textX, textY);
+    }
+}
